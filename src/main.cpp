@@ -15,6 +15,10 @@
 #define HALF 25
 #define FULL (HALF * 2)
 
+void I2C_Slave_WriteByte(byte data);
+int8_t I2C_Slave_WriteData(char *data);
+uint8_t I2C_Slave_ReadACK();
+void I2C_Slave_SendACK(); 
 uint8_t I2C_Slave_Begin(byte address);
 uint8_t I2C_Slave_ReadByte();
 void I2C_Slave_ReadData(byte *data,uint8_t count);
@@ -25,24 +29,30 @@ void setup() {
 }
 
 void loop() {
-  byte rev[10];
-  int8_t begin;
-  begin=I2C_Slave_Begin(0x55);
-  if(begin==0)
-  {
-    I2C_Slave_ReadData(rev,4);
-    Serial.println("Master write data- Slave read data");
-    Serial.println(String((char*)rev));
-  }
-  else if(begin==1)
-  {
-    Serial.println("read");
-  }
-  else if(begin==2)
-  {
-    Serial.println("wrong");
-  }
+   byte rev[10];
+   int8_t s,c;
+   s=I2C_Slave_Begin(0x55);
+   if(s==0)
+   { 
+      I2C_Slave_ReadData(rev,8);
+      Serial.println("Master want to write data");
+      Serial.println(String((char*)rev));
+   }
+   else if(s==1)
+   {
+    Serial.println("Master want to read data"); 
+    c = I2C_Slave_WriteData("abcd");
+    if(c==1)  Serial.println("Write successfully");
+    else if(c==-1)  Serial.println("fail to write");
+
+   }
+   else if(s==2)
+   {
+    Serial.println("Wrong address");
+   }
+   delay(100);
 }
+
 
 uint8_t I2C_Slave_Begin(byte address)
 {
@@ -84,6 +94,62 @@ uint8_t I2C_Slave_Begin(byte address)
     else{}
   }
 } 
+
+void I2C_Slave_WriteByte(byte data)
+{
+  SDA_OUTPUT;
+  for(int i=0;i<8;i++)
+  {
+    if( (data & 0x80) == 0x80)
+    {
+      SDA_HIGH;
+    }
+    else
+    {
+      SDA_LOW;
+    }
+    data = data << 1;
+    while(SCL_READ==0);
+    while(SCL_READ==1);
+  }  
+}
+
+int8_t I2C_Slave_WriteData(char *data)
+{
+  uint8_t ack;
+  while(*data != '\0')
+  {
+    I2C_Slave_WriteByte(*data);
+    ack = I2C_Slave_ReadACK();
+    if(ack==1)
+    {
+      SDA_INPUT;
+      return -1;
+    }
+    data++;
+  } 
+  SDA_INPUT;
+  return 1;
+}
+
+uint8_t I2C_Slave_ReadACK()
+{
+  uint8_t ack;
+  SDA_INPUT;
+  while(SCL_READ==0);
+  ack=SDA_READ;
+  while(SCL_READ==0);
+  return ack;
+}
+
+void I2C_Slave_SendACK()
+{
+  SDA_OUTPUT;
+  SDA_LOW;
+  while(SCL_READ==0);
+  while(SCL_READ==1);
+  SDA_INPUT;
+}
 
 uint8_t I2C_Slave_ReadByte()
 {
